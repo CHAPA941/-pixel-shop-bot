@@ -375,6 +375,27 @@ app.post('/telegram/webhook', async (req, res) => {
         res.sendStatus(200);
     }
 });
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
     console.log(`Сервер запущен на порту ${PORT}`);
+
+    try {
+        const webhookUrl =
+            `https://pixel-shop-bot-2.onrender.com/telegram/webhook`;
+
+        const response = await axios.get(
+            `https://api.telegram.org/bot${process.env.BOT_TOKEN}/setWebhook`,
+            {
+                params: {
+                    url: webhookUrl
+                }
+            }
+        );
+
+        console.log('Telegram webhook:', response.data);
+    } catch (error) {
+        console.error(
+            'Ошибка установки Telegram webhook:',
+            error.response?.data || error.message
+        );
+    }
 });
