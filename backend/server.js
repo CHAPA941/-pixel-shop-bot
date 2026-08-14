@@ -291,7 +291,90 @@ app.get('/', (req, res) => {
         message: 'Pixel Shop API работает!'
     });
 });
+app.post('/telegram/webhook', async (req, res) => {
+    try {
+        const update = req.body;
 
+        if (!update.message || !update.message.text) {
+            return res.sendStatus(200);
+        }
+
+        const chatId = update.message.chat.id;
+        const text = update.message.text.trim();
+
+        if (text === '/start') {
+            await axios.post(
+                `https://api.telegram.org/bot${process.env.BOT_TOKEN}/sendMessage`,
+                {
+                    chat_id: chatId,
+                    text:
+                        '👋 Добро пожаловать в Pixel Shop Bot!\n\n' +
+                        'Введите код заказа, например:\n' +
+                        'PX-7K42M9'
+                }
+            );
+
+            return res.sendStatus(200);
+        }
+
+        if (!text.startsWith('PX-')) {
+            return res.sendStatus(200);
+        }
+
+        db.get(
+            `SELECT * FROM orders WHERE code = ?`,
+            [text],
+            async (err, order) => {
+                if (err || !order) {
+                    await axios.post(
+                        `https://api.telegram.org/bot${process.env.BOT_TOKEN}/sendMessage`,
+                        {
+                            chat_id: chatId,
+                            text: '❌ Заказ с таким кодом не найден.'
+                        }
+                    );
+
+                    return res.sendStatus(200);
+                }
+
+                const products = JSON.parse(order.products);
+
+                const productList = products
+                    .map(p => `🐾 ${p.name} × ${p.quantity}`)
+                    .join('\n');
+
+                let statusText = '🟡 Ожидает оплаты';
+
+                if (order.status === 'paid') {
+                    statusText = '🟢 Оплачено';
+                } else if (order.status === 'completed') {
+                    statusText = '🔵 Выполнено';
+                } else if (order.status === 'cancelled') {
+                    statusText = '🔴 Отменено';
+                }
+
+                const message =
+                    `📦 Заказ: ${order.code}\n\n` +
+                    `${productList}\n\n` +
+                    `💫 Сумма: ${order.total} Stars\n` +
+                    `📊 Статус: ${statusText}`;
+
+                await axios.post(
+                    `https://api.telegram.org/bot${process.env.BOT_TOKEN}/sendMessage`,
+                    {
+                        chat_id: chatId,
+                        text: message
+                    }
+                );
+
+                res.sendStatus(200);
+            }
+        );
+    } catch (error) {
+        console.error('Telegram webhook error:', error);
+        res.sendStatus(200);
+    }
+});
 app.listen(PORT, () => {
     console.log(`Сервер запущен на порту ${PORT}`);
 });
