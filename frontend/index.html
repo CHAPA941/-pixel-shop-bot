@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pixel Shop — Игровой магазин</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<header>
+    <a href="index.html" class="logo">Pixel Shop</a>
+
+    <nav class="nav-links">
+        <a href="#" onclick="openCart(event)">
+            🛒 Корзина (<span id="cart-count">0</span>)
+        </a>
+
+        <a href="admin.html">🛠️ Админка</a>
+    </nav>
+</header>
+
+<main>
+
+    <section class="hero">
+        <div>
+            <h1>🐾 Pixel Shop</h1>
+            <p>Игровые петы за Telegram Stars</p>
+        </div>
+    </section>
+
+    <input
+        type="text"
+        id="search-input"
+        class="search-bar"
+        placeholder="🔎 Найти питомца..."
+        autocomplete="off"
+    >
+
+    <div class="categories" id="categories-container">
+
+        <button
+            class="cat-btn active"
+            onclick="filterCategory('all', this)"
+        >
+            🐾 Все
+        </button>
+
+        <button
+            class="cat-btn"
+            onclick="filterCategory('halloween', this)"
+        >
+            🎃 Halloween
+        </button>
+
+        <button
+            class="cat-btn"
+            onclick="filterCategory('new', this)"
+        >
+            ✨ Новинки
+        </button>
+
+        <button
+            class="cat-btn"
+            onclick="filterCategory('popular', this)"
+        >
+            🔥 Популярное
+        </button>
+
+    </div>
+
+    <section
+        class="products-grid"
+        id="products-grid"
+    ></section>
+
+</main>
+
+<!-- КОРЗИНА -->
+
+<div
+    id="cart-modal"
+    class="cart-modal"
+    style="display:none;"
+>
+
+    <div class="cart-panel">
+
+        <div class="cart-header">
+
+            <h2>📦 Ваш заказ</h2>
+
+            <button
+                class="close-cart"
+                onclick="closeCart()"
+            >
+                ✕
+            </button>
+
+        </div>
+
+        <div id="cart-items"></div>
+
+        <div class="cart-total">
+
+            <span>Итого:</span>
+
+            <span
+                id="cart-total"
+                class="total-price"
+            >
+                ⭐ 0 Stars
+            </span>
+
+        </div>
+
+        <button
+            class="btn checkout-btn"
+            onclick="checkoutOrder()"
+        >
+            Далее →
+        </button>
+
+    </div>
+
+</div>
+
+<div
+    id="toast"
+    class="toast"
+></div>
+
+<script src="script.js"></script>
+
+</body>
+</html>
