@@ -20,12 +20,53 @@ function generateOrderCode() {
     }
     return code;
 }
+function getStatusText(status) {
+    if (status === 'paid') {
+        return '🟢 Оплачено';
+    }
+    if (status === 'completed') {
+        return '🔵 Выполнено';
+    }
+    if (status === 'cancelled') {
+        return '🔴 Отменено';
+    }
+    return '🟡 Ожидает оплаты';
+}
+function getStatusButtons(code) {
+    return {
+        inline_keyboard: [
+            [
+                {
+                    text: '💰 Оплачено',
+                    callback_data: `paid:${code}`
+                },
+                {
+                    text: '✅ Выполнено',
+                    callback_data: `completed:${code}`
+                }
+            ],
+            [
+                {
+                    text: '❌ Отменить',
+                    callback_data: `cancelled:${code}`
+                }
+            ]
+        ]
+    };
+}
 // =====================================================
 // СОЗДАНИЕ ЗАКАЗА
 // =====================================================
 app.post('/api/orders', (req, res) => {
-    const { products, total } = req.body;
-    if (!products || !Array.isArray(products) || products.length === 0) {
+    const {
+        products,
+        total
+    } = req.body;
+    if (
+        !products ||
+        !Array.isArray(products) ||
+        products.length === 0
+    ) {
         return res.status(400).json({
             error: 'Корзина пуста'
         });
@@ -42,49 +83,52 @@ app.post('/api/orders', (req, res) => {
         ],
         async function(err) {
             if (err) {
-                console.error('Ошибка создания заказа:', err);
+                console.error(
+                    'Ошибка создания заказа:',
+                    err
+                );
                 return res.status(500).json({
                     error: err.message
                 });
             }
-            // Список товаров для Telegram
-            const productList = products
-                .map(product =>
-                    `🐾 ${product.name} × ${product.quantity || 1}`
-                )
-                .join('\n');
-            // Уведомление админу
-            if (BOT_TOKEN && ADMIN_CHAT_ID) {
+            const productList =
+                products
+                    .map(product =>
+                        `🐾 ${product.name} × ${product.quantity || 1}`
+                    )
+                    .join('\n');
+            const message =
+                `🔔 НОВЫЙ ЗАКАЗ!\n\n` +
+                `📦 Код: ${code}\n\n` +
+                `${productList}\n\n` +
+                `⭐ Сумма: ${total} Stars\n` +
+                `📊 Статус: 🟡 Ожидает оплаты`;
+            // Отправляем заказ админу
+            if (
+                BOT_TOKEN &&
+                ADMIN_CHAT_ID
+            ) {
                 try {
-                    const message =
-                        `🔔 НОВЫЙ ЗАКАЗ!\n\n` +
-                        `📦 Код: ${code}\n\n` +
-                        `${productList}\n\n` +
-                        `⭐ Сумма: ${total} Stars\n` +
-                        `📊 Статус: 🟡 Ожидает оплаты`;
                     await axios.post(
                         `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
                         {
                             chat_id: ADMIN_CHAT_ID,
-                            text: message
+                            text: message,
+                            reply_markup:
+                                getStatusButtons(code)
                         }
                     );
                     console.log(
-                        `Telegram: уведомление о заказе ${code} отправлено`
+                        `Заказ ${code} отправлен админу`
                     );
                 } catch (telegramError) {
                     console.error(
-                        'Ошибка отправки уведомления в Telegram:',
+                        'Ошибка Telegram:',
                         telegramError.response?.data ||
                         telegramError.message
                     );
                 }
-            } else {
-                console.log(
-                    'BOT_TOKEN или ADMIN_CHAT_ID не настроены'
-                );
             }
-            // Ответ сайту
             return res.json({
                 success: true,
                 code,
@@ -108,7 +152,8 @@ app.get('/api/orders/:code', (req, res) => {
                 });
             }
             try {
-                row.products = JSON.parse(row.products);
+                row.products =
+                    JSON.parse(row.products);
             } catch (e) {
                 row.products = [];
             }
@@ -117,7 +162,7 @@ app.get('/api/orders/:code', (req, res) => {
     );
 });
 // =====================================================
-// ПРОВЕРКА СТАТУСА ЗАКАЗА
+// ПРОВЕРКА СТАТУСА
 // =====================================================
 app.get('/api/orders/:code/status', (req, res) => {
     db.get(
@@ -136,23 +181,25 @@ app.get('/api/orders/:code/status', (req, res) => {
     );
 });
 // =====================================================
-// ПОИСК ИГРОКА ROBLOX
+// ПОИСК ROBLOX
 // =====================================================
 app.get('/api/users/search', async (req, res) => {
-    const username = req.query.username;
+    const username =
+        req.query.username;
     if (!username) {
         return res.status(400).json({
             error: 'Укажите ник'
         });
     }
     try {
-        const response = await axios.post(
-            'https://users.roblox.com/v1/usernames/users',
-            {
-                usernames: [username],
-                excludeBannedUsers: true
-            }
-        );
+        const response =
+            await axios.post(
+                'https://users.roblox.com/v1/usernames/users',
+                {
+                    usernames: [username],
+                    excludeBannedUsers: true
+                }
+            );
         if (
             !response.data.data ||
             response.data.data.length === 0
@@ -161,12 +208,14 @@ app.get('/api/users/search', async (req, res) => {
                 error: 'Игрок не найден'
             });
         }
-        const user = response.data.data[0];
+        const user =
+            response.data.data[0];
         let avatarUrl = '';
         try {
-            const thumbRes = await axios.get(
-                `https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${user.id}&size=150x150&format=Png&isCircular=false`
-            );
+            const thumbRes =
+                await axios.get(
+                    `https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${user.id}&size=150x150&format=Png&isCircular=false`
+                );
             if (
                 thumbRes.data.data &&
                 thumbRes.data.data.length > 0
@@ -176,7 +225,7 @@ app.get('/api/users/search', async (req, res) => {
             }
         } catch (e) {
             console.log(
-                'Не удалось получить аватар Roblox'
+                'Не удалось получить аватар'
             );
         }
         res.json({
@@ -187,308 +236,524 @@ app.get('/api/users/search', async (req, res) => {
             avatar: avatarUrl
         });
     } catch (e) {
-        console.error(
-            'Ошибка Roblox API:',
-            e.message
-        );
+        console.error(e);
         res.status(500).json({
-            error: 'Ошибка проверки Roblox API'
+            error:
+                'Ошибка проверки Roblox API'
         });
     }
 });
 // =====================================================
-// СОХРАНЕНИЕ ROBLOX ИГРОКА
+// СОХРАНЕНИЕ ROBLOX
 // =====================================================
-app.post('/api/orders/:code/username', (req, res) => {
-    const {
-        username,
-        roblox_id
-    } = req.body;
-    if (!username || !roblox_id) {
-        return res.status(400).json({
-            error: 'Неверные данные игрока'
-        });
-    }
-    db.run(
-        `UPDATE orders
-        SET username = ?, roblox_id = ?
-        WHERE code = ?`,
-        [
+app.post(
+    '/api/orders/:code/username',
+    (req, res) => {
+        const {
             username,
-            roblox_id,
-            req.params.code
-        ],
-        function(err) {
-            if (err) {
-                return res.status(500).json({
-                    error: err.message
-                });
-            }
-            res.json({
-                success: true
+            roblox_id
+        } = req.body;
+        if (
+            !username ||
+            !roblox_id
+        ) {
+            return res.status(400).json({
+                error:
+                    'Неверные данные игрока'
             });
         }
-    );
-});
-// =====================================================
-// АДМИН: ВХОД
-// =====================================================
-app.post('/api/admin/login', (req, res) => {
-    const {
-        password
-    } = req.body;
-    if (password === ADMIN_PASSWORD) {
-        res.json({
-            success: true,
-            token: 'admin-authorized-token'
-        });
-    } else {
-        res.status(401).json({
-            error: 'Неверный пароль'
-        });
-    }
-});
-// =====================================================
-// АДМИН: ПОЛУЧЕНИЕ ЗАКАЗОВ
-// =====================================================
-app.get('/api/admin/orders', (req, res) => {
-    const authHeader =
-        req.headers.authorization;
-    if (
-        !authHeader ||
-        authHeader !==
-        'Bearer admin-authorized-token'
-    ) {
-        return res.status(403).json({
-            error: 'Доступ запрещен'
-        });
-    }
-    db.all(
-        `SELECT * FROM orders
-        ORDER BY created_at DESC`,
-        [],
-        (err, rows) => {
-            if (err) {
-                return res.status(500).json({
-                    error: err.message
-                });
-            }
-            rows.forEach(row => {
-                try {
-                    row.products =
-                        JSON.parse(row.products);
-                } catch (e) {
-                    row.products = [];
+        db.run(
+            `UPDATE orders
+            SET username = ?, roblox_id = ?
+            WHERE code = ?`,
+            [
+                username,
+                roblox_id,
+                req.params.code
+            ],
+            function(err) {
+                if (err) {
+                    return res.status(500).json({
+                        error: err.message
+                    });
                 }
+                res.json({
+                    success: true
+                });
+            }
+        );
+    }
+);
+// =====================================================
+// АДМИН ВХОД
+// =====================================================
+app.post(
+    '/api/admin/login',
+    (req, res) => {
+        const {
+            password
+        } = req.body;
+        if (
+            password ===
+            ADMIN_PASSWORD
+        ) {
+            res.json({
+                success: true,
+                token:
+                    'admin-authorized-token'
             });
-            res.json(rows);
+        } else {
+            res.status(401).json({
+                error:
+                    'Неверный пароль'
+            });
         }
-    );
-});
+    }
+);
+// =====================================================
+// АДМИН: ЗАКАЗЫ
+// =====================================================
+app.get(
+    '/api/admin/orders',
+    (req, res) => {
+        const authHeader =
+            req.headers.authorization;
+        if (
+            !authHeader ||
+            authHeader !==
+            'Bearer admin-authorized-token'
+        ) {
+            return res.status(403).json({
+                error:
+                    'Доступ запрещен'
+            });
+        }
+        db.all(
+            `SELECT * FROM orders
+            ORDER BY created_at DESC`,
+            [],
+            (err, rows) => {
+                if (err) {
+                    return res.status(500).json({
+                        error:
+                            err.message
+                    });
+                }
+                rows.forEach(row => {
+                    try {
+                        row.products =
+                            JSON.parse(
+                                row.products
+                            );
+                    } catch (e) {
+                        row.products = [];
+                    }
+                });
+                res.json(rows);
+            }
+        );
+    }
+);
 // =====================================================
 // АДМИН: ИЗМЕНЕНИЕ СТАТУСА
 // =====================================================
-app.patch('/api/admin/orders/:code', (req, res) => {
-    const authHeader =
-        req.headers.authorization;
-    if (
-        !authHeader ||
-        authHeader !==
-        'Bearer admin-authorized-token'
-    ) {
-        return res.status(403).json({
-            error: 'Доступ запрещен'
-        });
-    }
-    const {
-        status
-    } = req.body;
-    const validStatuses = [
-        'pending',
-        'paid',
-        'completed',
-        'cancelled'
-    ];
-    if (!validStatuses.includes(status)) {
-        return res.status(400).json({
-            error: 'Неверный статус'
-        });
-    }
-    db.run(
-        `UPDATE orders
-        SET status = ?
-        WHERE code = ?`,
-        [
-            status,
-            req.params.code
-        ],
-        function(err) {
-            if (err) {
-                return res.status(500).json({
-                    error: err.message
-                });
-            }
-            res.json({
-                success: true
+app.patch(
+    '/api/admin/orders/:code',
+    (req, res) => {
+        const authHeader =
+            req.headers.authorization;
+        if (
+            !authHeader ||
+            authHeader !==
+            'Bearer admin-authorized-token'
+        ) {
+            return res.status(403).json({
+                error:
+                    'Доступ запрещен'
             });
         }
-    );
-});
+        const {
+            status
+        } = req.body;
+        const validStatuses = [
+            'pending',
+            'paid',
+            'completed',
+            'cancelled'
+        ];
+        if (
+            !validStatuses.includes(
+                status
+            )
+        ) {
+            return res.status(400).json({
+                error:
+                    'Неверный статус'
+            });
+        }
+        db.run(
+            `UPDATE orders
+            SET status = ?
+            WHERE code = ?`,
+            [
+                status,
+                req.params.code
+            ],
+            function(err) {
+                if (err) {
+                    return res.status(500).json({
+                        error:
+                            err.message
+                    });
+                }
+                res.json({
+                    success: true
+                });
+            }
+        );
+    }
+);
 // =====================================================
 // ГЛАВНАЯ
 // =====================================================
 app.get('/', (req, res) => {
     res.json({
         success: true,
-        message: 'Pixel Shop API работает!'
+        message:
+            'Pixel Shop API работает!'
     });
 });
 // =====================================================
 // TELEGRAM WEBHOOK
 // =====================================================
-app.post('/telegram/webhook', async (req, res) => {
-    try {
-        const update = req.body;
-        if (
-            !update.message ||
-            !update.message.text
-        ) {
-            return res.sendStatus(200);
-        }
-        const chatId =
-            update.message.chat.id;
-        const text =
-            update.message.text.trim();
-        // /start
-        if (text === '/start') {
-            await axios.post(
-                `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
-                {
-                    chat_id: chatId,
-                    text:
-                        '👋 Добро пожаловать в Pixel Shop Bot!\n\n' +
-                        'Введите код заказа, например:\n' +
-                        'PX-7K42M9'
+app.post(
+    '/telegram/webhook',
+    async (req, res) => {
+        try {
+            const update =
+                req.body;
+            // -----------------------------------------
+            // НАЖАТИЕ НА КНОПКУ АДМИНА
+            // -----------------------------------------
+            if (
+                update.callback_query
+            ) {
+                const callback =
+                    update.callback_query;
+                const callbackId =
+                    callback.id;
+                const chatId =
+                    callback.message.chat.id;
+                const messageId =
+                    callback.message.message_id;
+                const callbackData =
+                    callback.data || '';
+                // Только админ может нажимать кнопки
+                if (
+                    ADMIN_CHAT_ID &&
+                    String(chatId) !==
+                    String(ADMIN_CHAT_ID)
+                ) {
+                    await axios.post(
+                        `https://api.telegram.org/bot${BOT_TOKEN}/answerCallbackQuery`,
+                        {
+                            callback_query_id:
+                                callbackId,
+                            text:
+                                '⛔ У вас нет доступа'
+                        }
+                    );
+                    return res.sendStatus(200);
                 }
-            );
-            return res.sendStatus(200);
-        }
-        // Код заказа
-        if (!text.startsWith('PX-')) {
-            return res.sendStatus(200);
-        }
-        db.get(
-            `SELECT * FROM orders WHERE code = ?`,
-            [text],
-            async (err, order) => {
-                if (err || !order) {
-                    try {
+                const parts =
+                    callbackData.split(':');
+                const newStatus =
+                    parts[0];
+                const orderCode =
+                    parts.slice(1).join(':');
+                const allowedStatuses = [
+                    'paid',
+                    'completed',
+                    'cancelled'
+                ];
+                if (
+                    !allowedStatuses.includes(
+                        newStatus
+                    ) ||
+                    !orderCode
+                ) {
+                    return res.sendStatus(200);
+                }
+                // Меняем статус в базе
+                db.run(
+                    `UPDATE orders
+                    SET status = ?
+                    WHERE code = ?`,
+                    [
+                        newStatus,
+                        orderCode
+                    ],
+                    async function(err) {
+                        if (err) {
+                            console.error(
+                                'Ошибка изменения статуса:',
+                                err
+                            );
+                            await axios.post(
+                                `https://api.telegram.org/bot${BOT_TOKEN}/answerCallbackQuery`,
+                                {
+                                    callback_query_id:
+                                        callbackId,
+                                    text:
+                                        '❌ Ошибка изменения статуса'
+                                }
+                            );
+                            return res.sendStatus(200);
+                        }
+                        // Получаем обновленный заказ
+                        db.get(
+                            `SELECT * FROM orders WHERE code = ?`,
+                            [orderCode],
+                            async (
+                                getErr,
+                                order
+                            ) => {
+                                if (
+                                    getErr ||
+                                    !order
+                                ) {
+                                    return res.sendStatus(
+                                        200
+                                    );
+                                }
+                                let products = [];
+                                try {
+                                    products =
+                                        JSON.parse(
+                                            order.products
+                                        );
+                                } catch (e) {
+                                    products = [];
+                                }
+                                const productList =
+                                    products
+                                        .map(
+                                            product =>
+                                                `🐾 ${product.name} × ${product.quantity || 1}`
+                                        )
+                                        .join(
+                                            '\n'
+                                        );
+                                const newMessage =
+                                    `📦 ЗАКАЗ: ${order.code}\n\n` +
+                                    `${productList}\n\n` +
+                                    `⭐ Сумма: ${order.total} Stars\n` +
+                                    `📊 Статус: ${getStatusText(order.status)}`;
+                                try {
+                                    await axios.post(
+                                        `https://api.telegram.org/bot${BOT_TOKEN}/editMessageText`,
+                                        {
+                                            chat_id:
+                                                chatId,
+                                            message_id:
+                                                messageId,
+                                            text:
+                                                newMessage,
+                                            reply_markup:
+                                                getStatusButtons(
+                                                    order.code
+                                                )
+                                        }
+                                    );
+                                } catch (
+                                    editError
+                                ) {
+                                    console.error(
+                                        'Ошибка обновления сообщения:',
+                                        editError.response?.data ||
+                                        editError.message
+                                    );
+                                }
+                                try {
+                                    await axios.post(
+                                        `https://api.telegram.org/bot${BOT_TOKEN}/answerCallbackQuery`,
+                                        {
+                                            callback_query_id:
+                                                callbackId,
+                                            text:
+                                                `Статус изменён: ${getStatusText(order.status)}`
+                                        }
+                                    );
+                                } catch (e) {
+                                    console.error(
+                                        'Ошибка callback:',
+                                        e.message
+                                    );
+                                }
+                                return res.sendStatus(
+                                    200
+                                );
+                            }
+                        );
+                    }
+                );
+                return;
+            }
+            // -----------------------------------------
+            // ОБЫЧНОЕ СООБЩЕНИЕ
+            // -----------------------------------------
+            if (
+                !update.message ||
+                !update.message.text
+            ) {
+                return res.sendStatus(
+                    200
+                );
+            }
+            const chatId =
+                update.message.chat.id;
+            const text =
+                update.message.text.trim();
+            // /start
+            if (
+                text === '/start'
+            ) {
+                await axios.post(
+                    `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
+                    {
+                        chat_id:
+                            chatId,
+                        text:
+                            '👋 Добро пожаловать в Pixel Shop Bot!\n\n' +
+                            'Введите код заказа, например:\n' +
+                            'PX-7K42M9'
+                    }
+                );
+                return res.sendStatus(
+                    200
+                );
+            }
+            // Код заказа
+            if (
+                !text.startsWith(
+                    'PX-'
+                )
+            ) {
+                return res.sendStatus(
+                    200
+                );
+            }
+            // Ищем заказ
+            db.get(
+                `SELECT * FROM orders WHERE code = ?`,
+                [text],
+                async (
+                    err,
+                    order
+                ) => {
+                    if (
+                        err ||
+                        !order
+                    ) {
                         await axios.post(
                             `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
                             {
-                                chat_id: chatId,
+                                chat_id:
+                                    chatId,
                                 text:
                                     '❌ Заказ с таким кодом не найден.'
                             }
                         );
-                    } catch (e) {
-                        console.error(
-                            'Ошибка Telegram:',
-                            e.message
+                        return res.sendStatus(
+                            200
                         );
                     }
-                    return res.sendStatus(200);
-                }
-                let products = [];
-                try {
-                    products =
-                        JSON.parse(order.products);
-                } catch (e) {
-                    products = [];
-                }
-                const productList =
-                    products
-                        .map(product =>
-                            `🐾 ${product.name} × ${product.quantity || 1}`
-                        )
-                        .join('\n');
-                let statusText =
-                    '🟡 Ожидает оплаты';
-                if (order.status === 'paid') {
-                    statusText =
-                        '🟢 Оплачено';
-                }
-                if (order.status === 'completed') {
-                    statusText =
-                        '🔵 Выполнено';
-                }
-                if (order.status === 'cancelled') {
-                    statusText =
-                        '🔴 Отменено';
-                }
-                const message =
-                    `📦 Заказ: ${order.code}\n\n` +
-                    `${productList}\n\n` +
-                    `⭐ Сумма: ${order.total} Stars\n` +
-                    `📊 Статус: ${statusText}`;
-                try {
+                    let products = [];
+                    try {
+                        products =
+                            JSON.parse(
+                                order.products
+                            );
+                    } catch (e) {
+                        products = [];
+                    }
+                    const productList =
+                        products
+                            .map(
+                                product =>
+                                    `🐾 ${product.name} × ${product.quantity || 1}`
+                            )
+                            .join(
+                                '\n'
+                            );
+                    const message =
+                        `📦 Заказ: ${order.code}\n\n` +
+                        `${productList}\n\n` +
+                        `⭐ Сумма: ${order.total} Stars\n` +
+                        `📊 Статус: ${getStatusText(order.status)}`;
                     await axios.post(
                         `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
                         {
-                            chat_id: chatId,
-                            text: message
+                            chat_id:
+                                chatId,
+                            text:
+                                message
                         }
                     );
-                } catch (e) {
-                    console.error(
-                        'Ошибка отправки заказа в Telegram:',
-                        e.message
+                    return res.sendStatus(
+                        200
                     );
                 }
-                return res.sendStatus(200);
-            }
-        );
-    } catch (error) {
-        console.error(
-            'Telegram webhook error:',
-            error.message
-        );
-        return res.sendStatus(200);
+            );
+        } catch (error) {
+            console.error(
+                'Telegram webhook error:',
+                error.message
+            );
+            return res.sendStatus(
+                200
+            );
+        }
     }
-});
+);
 // =====================================================
-// ЗАПУСК СЕРВЕРА + АВТОМАТИЧЕСКИЙ WEBHOOK
+// ЗАПУСК СЕРВЕРА
 // =====================================================
-app.listen(PORT, async () => {
-    console.log(
-        `Сервер запущен на порту ${PORT}`
-    );
-    if (!BOT_TOKEN) {
-        console.error(
-            '❌ BOT_TOKEN не найден в Environment!'
-        );
-        return;
-    }
-    try {
-        const webhookUrl =
-            'https://pixel-shop-bot-2.onrender.com/telegram/webhook';
-        const response = await axios.get(
-            `https://api.telegram.org/bot${BOT_TOKEN}/setWebhook`,
-            {
-                params: {
-                    url: webhookUrl
-                }
-            }
-        );
+app.listen(
+    PORT,
+    async () => {
         console.log(
-            'Telegram webhook:',
-            response.data
+            `Сервер запущен на порту ${PORT}`
         );
-    } catch (error) {
-        console.error(
-            'Ошибка установки Telegram webhook:',
-            error.response?.data ||
-            error.message
-        );
+        if (!BOT_TOKEN) {
+            console.error(
+                '❌ BOT_TOKEN не найден!'
+            );
+            return;
+        }
+        try {
+            const webhookUrl =
+                'https://pixel-shop-bot-2.onrender.com/telegram/webhook';
+            const response =
+                await axios.get(
+                    `https://api.telegram.org/bot${BOT_TOKEN}/setWebhook`,
+                    {
+                        params: {
+                            url:
+                                webhookUrl
+                        }
+                    }
+                );
+            console.log(
+                'Telegram webhook:',
+                response.data
+            );
+        } catch (error) {
+            console.error(
+                'Ошибка установки Telegram webhook:',
+                error.response?.data ||
+                error.message
+            );
+        }
     }
-});
+);
