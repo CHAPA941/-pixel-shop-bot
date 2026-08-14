@@ -26,11 +26,66 @@ function generateOrderCode() {
 // Создание заказа
 app.post('/api/orders', (req, res) => {
     const { products, total } = req.body;
-
     if (!products || !products.length) {
         return res.status(400).json({
             error: 'Корзина пуста'
         });
+    }
+    const code = generateOrderCode();
+    db.run(
+        `INSERT INTO orders
+        (code, products, total, status)
+        VALUES (?, ?, ?, 'pending')`,
+        [code, JSON.stringify(products), total],
+        async function(err) {
+            if (err) {
+                return res.status(500).json({
+                    error: err.message
+                });
+            }
+            // Формируем список товаров
+            const productList = products
+                .map(product =>
+                    `🐾 ${product.name} × ${product.quantity || 1}`
+                )
+                .join('\n');
+            // Отправляем уведомление админу
+            if (process.env.BOT_TOKEN && process.env.ADMIN_CHAT_ID) {
+                try {
+                    const message =
+                        `🔔 НОВЫЙ ЗАКАЗ!\n\n` +
+                        `📦 Код: ${code}\n\n` +
+                        `${productList}\n\n` +
+                        `⭐ Сумма: ${total} Stars\n` +
+                        `📊 Статус: 🟡 Ожидает оплаты`;
+                    await axios.post(
+                        `https://api.telegram.org/bot${process.env.BOT_TOKEN}/sendMessage`,
+                        {
+                            chat_id: process.env.ADMIN_CHAT_ID,
+                            text: message
+                        }
+                    );
+                    console.log(
+                        `Уведомление о заказе ${code} отправлено админу`
+                    );
+                } catch (telegramError) {
+                    console.error(
+                        'Ошибка отправки уведомления:',
+                        telegramError.response?.data ||
+                        telegramError.message
+                    );
+                }
+            }
+            // Отвечаем сайту
+            res.json({
+                success: true,
+                code,
+                total,
+                status: 'pending'
+            });
+        }
+    );
+});
     }
 
     const code = generateOrderCode();
